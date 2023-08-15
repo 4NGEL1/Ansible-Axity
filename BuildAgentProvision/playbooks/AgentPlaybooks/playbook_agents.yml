@@ -1,0 +1,44 @@
+---
+- name: Download, Install and Configure the Azure agent build
+  hosts: buildAgents
+  vars_files:
+    - /workspaces/Ansible-Axity/BuildAgentProvision/group_vars/all/vars.yml
+  tasks:
+    - name: Elimina una configuración previa del agente
+      file:
+        path: /home/adminuser/azagent
+        state: absent
+      ignore_errors: yes
+    
+    - name: Crear directorio de agente
+      file:
+        path: /home/adminuser/azagent
+        state: directory
+    
+    - name: Descargar archivo de agente
+      get_url:
+        url: "{{agent_url_download}}"
+        dest: /home/adminuser/azagent/vsts-agent-linux-x64-3.220.2.tar.gz
+    
+    - name: Descomprimir archivo de agente
+      unarchive:
+        src: /home/adminuser/azagent/vsts-agent-linux-x64-3.220.2.tar.gz
+        dest: /home/adminuser/azagent/
+        remote_src: true
+    
+    - name: Install agent
+      shell: >
+        cd /home/adminuser/azagent/
+        export AGENT_ALLOW_RUNASROOT="1"
+        ./config.sh --unattended --url "{{url_azure}}" --auth pat --token "{{token_azure}}" --pool "{{name_pool_azure}}" --agent "Self_Hosted_Agent_03_$(date +'%Y%m%d')" --replace
+    
+    - name: Asigna permisos a la carpeta del agente
+      shell: |
+        cd /home/adminuser/azagent/
+        chown -R "{{user_name_vm}}":"{{user_name_vm}}" .
+    
+    - name: Start Agent
+      become_user: "{{user_name_vm}}"
+      shell: |
+        cd /home/adminuser/azagent
+        nohup ./run.sh </dev/null >/dev/null 2>&1 &
